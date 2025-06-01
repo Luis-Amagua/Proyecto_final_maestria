@@ -38,5 +38,7 @@ Latencia: <3s (doc. cortos), <8s (doc. largos)
 
 Coste/Análisis: ~$0.002 (Gemini Flash)
 
+Para correr el código, se debe reemplazar el archivo ".env"
+la información de este archivo debe ser GOOGLE_API_KEY="tu clave de gemini"
 instalacion: pip install -r requirements.txt
 ejecucion: python run.py
