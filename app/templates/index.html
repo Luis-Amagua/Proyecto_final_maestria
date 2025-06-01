@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClausaLens - Análisis de Contratos</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 40px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            margin-top: 30px;
+        }
+        .column {
+            flex: 1;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        .chatgpt-box {
+            margin-top: 20px;
+            height: 300px;
+            background-color: #eef;
+            border-radius: 6px;
+            padding: 10px;
+            overflow-y: auto;
+            font-style: italic;
+            color: #333;
+        }
+        .upload-btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #4285f4;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            text-align: center;
+            transition: background-color 0.3s;
+        }
+        .upload-btn:hover {
+            background-color: #3367d6;
+        }
+        input[type="file"] {
+            display: none;
+        }
+        #upload-loading {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            text-align: center;
+            color: #5f6368;
+        }
+        /* Estilos mínimos necesarios para nuevas funcionalidades */
+        .chat-message {
+            margin-bottom: 12px;
+            padding: 10px 15px;
+            border-radius: 18px;
+            max-width: 85%;
+            line-height: 1.5;
+            font-size: 14px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            word-wrap: break-word;
+        }
+        .user-message {
+            background-color: #4285f4;
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 4px;
+        }
+        .ai-message {
+            background-color: #f1f3f4;
+            margin-right: auto;
+            border-bottom-left-radius: 4px;
+        }
+        .chat-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        #chat-input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 1px solid #dfe1e5;
+            border-radius: 24px;
+            font-size: 14px;
+            outline: none;
+        }
+        #send-button {
+            padding: 12px 20px;
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 24px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .analysis-result {
+            background-color: #e8f0fe;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #4285f4;
+        }
+        .error-message {
+            color: #d93025;
+            background: #fce8e6;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            display: none;
+        }
+        iframe {
+            width: 100%;
+            height: 500px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1 style="text-align:center; color: #1967d2; margin-bottom: 5px;">ClausaLens</h1>
+        <h2 style="text-align:center; color: #5f6368; font-weight: normal; margin-top: 0;">
+            Análisis inteligente de contratos vs. normativas internas
+        </h2>
+    </header>
+
+    <main>
+        <form method="POST" enctype="multipart/form-data" id="upload-form">
+            <div class="container">
+                <!-- Columna 1 - Carga y Chat -->
+                <div class="column">
+                    <div style="text-align: center;">
+                        <h3>Cargar Contrato PDF</h3>
+                        <label for="pdf-upload" class="upload-btn">
+                            Seleccionar archivo
+                            <input type="file" id="pdf-upload" name="pdf" accept="application/pdf" required>
+                        </label>
+                        <p style="margin-top: 10px; color: #5f6368;">
+                            Formatos admitidos: PDF (máx. 10MB)
+                        </p>
+                    </div>
+                    
+                    {% if error %}
+                    <div class="error-message" style="display: block;">
+                        {{ error }}
+                    </div>
+                    {% endif %}
+                    
+                    {% if analysis and analysis_ready %}
+                    <div class="analysis-result">
+                        <h4>🔍 Análisis Automático</h4>
+                        <p>{{ analysis | safe }}</p>
+                    </div>
+                    {% elif current_file %}
+                    <div id="upload-loading">
+                        <p>Procesando documento ({{ page_count }} páginas)...</p>
+                    </div>
+                    {% endif %}
+                    
+                    <h3>Asistente de Análisis</h3>
+                    <div class="chatgpt-box" id="chat-history">
+                        {% if analysis and analysis_ready %}
+                        <div class="ai-message chat-message">
+                            He analizado el contrato. ¿En qué más puedo ayudarte?<br><br>
+                            Puedes preguntar sobre:<br>
+                            • Comparación con la normativa<br>
+                            • Cláusulas específicas<br>
+                            • Recomendaciones<br>
+                            • Riesgos potenciales
+                        </div>
+                        {% else %}
+                        <div class="ai-message chat-message">
+                            👋 Bienvenido a ClausaLens<br><br>
+                            Por favor, sube un contrato PDF para comenzar el análisis.
+                            Una vez cargado, podré ayudarte a:<br>
+                            • Compararlo con la normativa interna<br>
+                            • Identificar discrepancias<br>
+                            • Generar recomendaciones
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="chat-controls">
+                        <input type="text" id="chat-input" placeholder="Escribe tu pregunta sobre el contrato...">
+                        <button id="send-button" type="button">Enviar</button>
+                    </div>
+                </div>
+
+                <!-- Columna 2 - Normativa -->
+                <div class="column">
+                    <h3>📜 Normativa Interna</h3>
+                    <iframe src="{{ url_for('static', filename='uploads/normativa.pdf') }}"></iframe>
+                </div>
+
+                <!-- Columna 3 - Contrato -->
+                <div class="column">
+                    <h3>📄 Contrato Analizado</h3>
+                    {% if contrato_file %}
+                        <iframe src="{{ url_for('static', filename='uploads/' + contrato_file) }}"></iframe>
+                    {% else %}
+                        <p style="text-align: center; color: #5f6368; margin-top: 50px;">
+                            El contrato subido aparecerá aquí  
+                        </p>
+                    {% endif %}
+                </div>
+            </div>
+        </form>
+    </main>
+
+    <script>
+        // Manejo de errores
+        document.getElementById('upload-form').addEventListener('submit', function(e) {
+            const fileInput = document.getElementById('pdf-upload');
+            if (fileInput.files.length === 0) {
+                e.preventDefault();
+                document.querySelector('.error-message').textContent = 'Por favor selecciona un archivo PDF';
+                document.querySelector('.error-message').style.display = 'block';
+            } else if (fileInput.files[0].size > 10 * 1024 * 1024) {
+                e.preventDefault();
+                document.querySelector('.error-message').textContent = 'El archivo es demasiado grande (máximo 10MB)';
+                document.querySelector('.error-message').style.display = 'block';
+            }
+        });
+
+        // Chat interactivo
+        document.getElementById('send-button').addEventListener('click', function() {
+            const message = document.getElementById('chat-input').value.trim();
+            if (!message) return;
+
+            const chatHistory = document.getElementById('chat-history');
+            
+            // Mostrar mensaje del usuario
+            chatHistory.innerHTML += `
+                <div class="user-message chat-message">
+                    ${message}
+                </div>
+            `;
+            
+            // Mostrar indicador de escritura
+            chatHistory.innerHTML += `
+                <div class="ai-message chat-message">
+                    Analizando tu consulta...
+                </div>
+            `;
+            
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+            document.getElementById('chat-input').value = '';
+            
+            // Enviar al servidor
+            fetch('/ask', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `question=${encodeURIComponent(message)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Remover indicador y mostrar respuesta
+                chatHistory.querySelector('.ai-message:last-child').remove();
+                chatHistory.innerHTML += `
+                    <div class="ai-message chat-message">
+                        ${data.response.replace(/\n/g, '<br>')}
+                    </div>
+                `;
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+            });
+        });
+
+        // Verificar estado del análisis
+        {% if current_file and not analysis_ready %}
+        setInterval(() => {
+            fetch('/check_analysis')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.ready) {
+                        location.reload();
+                    }
+                });
+        }, 2000);
+        {% endif %}
+    </script>
+</body>
+</html>
